@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Moorhuhn Style Game</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: url('img/menu_background.jpg') no-repeat center center;
+      background-size: cover;
+      font-family: Arial, sans-serif;
+    }
+    #menu, #gameOver, #helpModal {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.5);
+    }
+    #menu button, #gameOver button, #helpModal button {
+      font-size: 20px;
+      margin: 10px;
+      padding: 10px 20px;
+    }
+    #gameCanvas {
+      background-color: transparent;
+      border: 2px solid #000;
+      display: none;
+    }
+    #gameOver {
+      display: none;
+    }
+    #gameOver h1, #gameOver p {
+      color: white;
+    }
+    #helpModal {
+      display: none;
+      text-align: center;
+      background-color: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 20px;
+    }
+    #menuButtons, #gameOverButtons {
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+  </style>
+  </head>
+  <body>
+    <div id="menu">
+      <div id="menuButtons">
+        <button onclick="startGame()">Play</button>
+        <button onclick="showHelp()">Help</button>
+      </div>
+    </div>
+  
+    <div id="gameOver">
+      <div id="gameOverButtons">
+        <h1>Game Over</h1>
+        <p id="finalScore"></p>
+        <button onclick="startGame()">Play again</button>
+      </div>
+    </div>
+  
+    <div id="helpModal">
+      <h1>Reference</h1>
+      <p>The goal of the game is to click on the coins. Use the mouse to click and the left/right arrows to scroll the screen.</p>
+      <p>Points per click:</p>
+      <ul>
+        <li>Big coin: 10 points</li>
+        <li>Medium coin: 20 points</li>
+        <li>Small coin: 50 points</li>
+        <li>Meteorites: -20 points</li>
+      </ul>
+      <button onclick="closeHelp()">Close</button>
+    </div>
+
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let targets = [];
+    let meteors = [];
+    let score = 0;
+    let timeLeft = 60;
+    let gameInterval, targetInterval, meteorInterval;
+    let scrollX = 0;
+    let scrollSpeed = 0;
+
+    const background = new Image();
+    background.src = 'img/background.jpg';
+
+    const images = {
+      red: new Image(),
+      yellow: new Image(),
+      green: new Image(),
+      meteor1: new Image(),
+      meteor2: new Image()
+    };
+    images.red.src = 'img/third_coin.webp';
+    images.yellow.src = 'img/second_coin.webp';
+    images.green.src = 'img/first_coin.webp';
+    images.meteor1.src = 'img/meteor1.webp';
+    images.meteor2.src = 'img/meteor2.webp';
+
+    const targetTypes = [
+      { points: 10, size: 90, image: images.red },
+      { points: 20, size: 70, image: images.yellow },
+      { points: 50, size: 50, image: images.green }
+    ];
+
+    const meteorTypes = [
+      { points: -20, size: 60, image: images.meteor1 },
+      { points: -20, size: 60, image: images.meteor2 }
+    ];
+
+    function initGame() {
+      targets = [];
+      meteors = [];
+      score = 0;
+      timeLeft = 60;
+      scrollX = 0;
+      scrollSpeed = 0;
+
+      document.getElementById('menu').style.display = 'none';
+      document.getElementById('gameOver').style.display = 'none';
+      canvas.style.display = 'block';
+
+      if (gameInterval) clearInterval(gameInterval);
+      if (targetInterval) clearInterval(targetInterval);
+      if (meteorInterval) clearInterval(meteorInterval);
+
+      gameInterval = setInterval(gameLoop, 1000 / 60);
+      targetInterval = setInterval(spawnTarget, 900);
+      meteorInterval = setInterval(spawnMeteor, 5000);
+    }
+
+    function spawnTarget() {
+      const type = targetTypes[Math.floor(Math.random() * targetTypes.length)];
+      const x = Math.random() * (canvas.width * 3);
+      const y = Math.random() * canvas.height;
+      const dx = (Math.random() * 3 - 1) * 2;
+      const dy = (Math.random() * 3 - 1) * 2;
+      targets.push({ x, y, size: type.size, points: type.points, image: type.image, dx, dy });
+    }
+
+    function spawnMeteor() {
+      const type = meteorTypes[Math.floor(Math.random() * meteorTypes.length)];
+      const x = Math.random() * (canvas.width * 3);
+      const y = Math.random() * canvas.height;
+      const dx = (Math.random() * 3 - 1) * 2;
+      const dy = (Math.random() * 3 - 1) * 2;
+      meteors.push({ x, y, size: type.size, points: type.points, image: type.image, dx, dy });
+    }
+
+    function drawBackground() {
+      ctx.drawImage(background, -scrollX, 0, canvas.width * 3, canvas.height);
+    }
+
+    function drawObjects(objects) {
+      objects.forEach(object => {
+        ctx.drawImage(object.image, object.x - object.size / 2 - scrollX, object.y - object.size / 2, object.size, object.size);
+      });
+    }
+
+    function updateObjects(objects) {
+      objects.forEach(object => {
+        object.x += object.dx;
+        object.y += object.dy;
+
+        if (object.x + object.size < 0 || object.x - object.size > canvas.width * 3 ||
+            object.y + object.size < 0 || object.y - object.size > canvas.height) {
+          objects = objects.filter(o => o !== object);
+        }
+      });
+      return objects.filter(object => object.x + object.size > 0 && object.x - object.size < canvas.width * 3);
+    }
+
+    function drawScore() {
+      ctx.font = "20px Arial";
+      ctx.fillStyle = "white";
+      ctx.fillText(`Ston.fi coins: ${score}`, 10, 30);
+    }
+
+    function drawTime() {
+      ctx.font = "20px Arial";
+      ctx.fillStyle = "white";
+      ctx.fillText(`Time: ${timeLeft.toFixed(1)}`, canvas.width - 100, 30);
+    }
+
+    function gameLoop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawBackground();
+      drawObjects(targets);
+      drawObjects(meteors);
+      drawScore();
+      drawTime();
+      targets = updateObjects(targets);
+      meteors = updateObjects(meteors);
+
+      scrollX += scrollSpeed;
+      scrollX = Math.max(0, Math.min(scrollX, canvas.width * 2));
+
+      timeLeft -= 1 / 60;
+      if (timeLeft <= 0) {
+        clearInterval(gameInterval);
+        clearInterval(targetInterval);
+        clearInterval(meteorInterval);
+        canvas.style.display = 'none';
+        document.getElementById('gameOver').style.display = 'block';
+        document.getElementById('finalScore').innerText = `Number of coins: ${score}`;
+      }
+    }
+
+    function shoot(event) {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left + scrollX;
+      const mouseY = event.clientY - rect.top;
+
+      for (let i = 0; i < targets.length; i++) {
+        const target = targets[i];
+        const dx = mouseX - target.x;
+        const dy = mouseY - target.y;
+        if (Math.sqrt(dx * dx + dy * dy) < target.size) {
+          score += target.points;
+          targets.splice(i, 1);
+          return;
+        }
+      }
+
+      for (let i = 0; i < meteors.length; i++) {
+        const meteor = meteors[i];
+        const dx = mouseX - meteor.x;
+        const dy = mouseY - meteor.y;
+        if (Math.sqrt(dx * dx + dy * dy) < meteor.size) {
+          score += meteor.points;
+          meteors.splice(i, 1);
+          return;
+        }
+      }
+    }
+
+    function scroll(event) {
+      const scrollAmount = 5;
+      if (event.key === 'ArrowLeft') {
+        scrollSpeed = -scrollAmount;
+      } else if (event.key === 'ArrowRight') {
+        scrollSpeed = scrollAmount;
+      } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        scrollSpeed = 0;
+      }
+    }
+
+    document.addEventListener('keydown', scroll);
+    document.addEventListener('keyup', () => scrollSpeed = 0);
+
+    canvas.addEventListener('click', shoot);
+
+    function startGame() {
+      initGame();
+    }
+
+    function showHelp() {
+      document.getElementById('helpModal').style.display = 'flex';
+    }
+
+    function closeHelp() {
+      document.getElementById('helpModal').style.display = 'none';
+    }
+
+    let imagesLoaded = 0;
+    const totalImages = Object.keys(images).length + 1;
+
+    function checkAllImagesLoaded() {
+      imagesLoaded++;
+      if (imagesLoaded === totalImages) {
+        document.getElementById('menu').style.display = 'block';
+      }
+    }
+
+    background.onload = checkAllImagesLoaded;
+    for (const key in images) {
+      images[key].onload = checkAllImagesLoaded;
+    }
+  </script>
+</body>
+</html>
