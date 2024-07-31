@@ -95,7 +95,7 @@
     let targets = [];
     let meteors = [];
     let score = 0;
-    let timeLeft = 60;
+    let timeLeft = 90;
     let gameInterval, targetInterval, meteorInterval;
     let scrollX = 0;
     let scrollSpeed = 0;
@@ -127,11 +127,16 @@
       { points: -20, size: 60, image: images.meteor2 }
     ];
 
+    const coinSound = new Audio('sounds/coin_sound.mp3');
+    const meteorSound = new Audio('sounds/meteor_sound.mp3');
+    coinSound.volume = 0.3
+    meteorSound.volume = 0.4
+
     function initGame() {
       targets = [];
       meteors = [];
       score = 0;
-      timeLeft = 60;
+      timeLeft = 90;
       scrollX = 0;
       scrollSpeed = 0;
 
@@ -225,7 +230,7 @@
       }
     }
 
-    function shoot(event) {
+    function click(event) {
       const rect = canvas.getBoundingClientRect();
       const mouseX = event.clientX - rect.left + scrollX;
       const mouseY = event.clientY - rect.top;
@@ -237,6 +242,7 @@
         if (Math.sqrt(dx * dx + dy * dy) < target.size) {
           score += target.points;
           targets.splice(i, 1);
+          coinSound.play();
           return;
         }
       }
@@ -248,6 +254,7 @@
         if (Math.sqrt(dx * dx + dy * dy) < meteor.size) {
           score += meteor.points;
           meteors.splice(i, 1);
+          meteorSound.play();
           return;
         }
       }
@@ -267,7 +274,7 @@
     document.addEventListener('keydown', scroll);
     document.addEventListener('keyup', () => scrollSpeed = 0);
 
-    canvas.addEventListener('click', shoot);
+    canvas.addEventListener('click', click);
 
     function startGame() {
       initGame();
